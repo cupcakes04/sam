@@ -1,0 +1,3 @@
+# Ignore all model weights
+*.pt
+
