@@ -5,6 +5,8 @@ This repository contains an interactive segmentation tool built using Meta's Seg
 **Please refer to this repo to set up sam2 modules first**
 https://github.com/facebookresearch/sam2
 
+insert the .pt files inside `sam2/sam/checkpoints`
+
 ## Features
 
 - **Interactive Segmentation**: Click on images to add positive/negative points for segmentation
