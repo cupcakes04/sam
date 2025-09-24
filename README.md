@@ -11,21 +11,19 @@ Then, insert the .pt files inside `sam2/sam/checkpoints`
 
 <div style="display: flex; gap: 20px; flex-wrap: wrap;">
   <figure style="text-align: center;">
-    <img src="./output/img/overlay/war.png" alt="Overlay Image" width="300">
+    <img src="./assets/war.png" alt="Overlay Image" width="200">
     <figcaption>Overlay Image</figcaption>
   </figure>
 
   <figure style="text-align: center;">
-    <img src="./output/img/transparent/war_transparent.png" alt="Transparent Image" width="300">
+    <img src="./assets/war_transparent.png" alt="Transparent Image" width="200">
     <figcaption>Transparent Image</figcaption>
   </figure>
 </div>
 
-<h3>Videos</h3>
-
 <p>
-  <a href="./output/vid/chika_2/raw_folder/chika_2.mp4">▶ Video Overlay</a><br>
-  <a href="./output/vid/04_coffee/raw_folder/04_coffee_transparent.mp4">▶ Green Screen</a>
+  <img src="./assets/chika_2.gif" alt="Video Overlay" width="400"><br>
+  <img src="./assets/04_coffee_transparent.gif" alt="Green Screen" width="400">
 </p>
 
 
