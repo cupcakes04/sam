@@ -81,11 +81,12 @@ python gui.py
 4. Add annotations to the current frame (similar to Image Mode)
 5. Use propagation to extend annotations across the video
 6. Navigate frames with the slider or navigation buttons
-7. Save results via "File > Save Masks Video"
+7. Choose save modes (*Save Transparent* mode creates green screen mp4 files)
+8. Save results via "File > Save Masks Video" (video results will be in *video_name/raw_folder/*)
 
 ### Live Mode
 1. Select "Live Mode" from the controls
-2. Choose video source (Camera, Screen, or Video File)
+2. Choose video source (Camera, Screen, or Video File, curently only camera supported)
 3. Add initial annotations
 4. Start the stream and optionally enable live propagation
 5. Adjust delay for processing speed
@@ -120,6 +121,7 @@ When saving masks:
 - **Color**: Colored mask with different colors for each object
 - **Overlay**: Original image with segmentation overlay
 - **Numpy**: Raw segmentation data in numpy array format
+- **Transparent**: Images that have the background set to transparent
 
 ## Note to self:
 1) Make changes (edit code, add files, delete stuff, etc).
