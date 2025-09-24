@@ -5,7 +5,29 @@ This repository contains an interactive segmentation tool built using Meta's Seg
 **Please refer to this repo to set up sam2 modules first**
 https://github.com/facebookresearch/sam2
 
-insert the .pt files inside `sam2/sam/checkpoints`
+Then, insert the .pt files inside `sam2/sam/checkpoints`
+
+<h2>Results</h2>
+
+<div style="display: flex; gap: 20px; flex-wrap: wrap;">
+  <figure style="text-align: center;">
+    <img src="./output/img/overlay/war.png" alt="Overlay Image" width="300">
+    <figcaption>Overlay Image</figcaption>
+  </figure>
+
+  <figure style="text-align: center;">
+    <img src="./output/img/transparent/war_transparent.png" alt="Transparent Image" width="300">
+    <figcaption>Transparent Image</figcaption>
+  </figure>
+</div>
+
+<h3>Videos</h3>
+
+<p>
+  <a href="./output/vid/chika_2/raw_folder/chika_2.mp4">▶ Video Overlay</a><br>
+  <a href="./output/vid/04_coffee/raw_folder/04_coffee_transparent.mp4">▶ Green Screen</a>
+</p>
+
 
 ## Features
 
@@ -74,6 +96,13 @@ python gui.py
 8. Adjust overlay alpha and borders as needed
 9. Save results via "File > Save Masks Image"
 
+    **Output formats for saving image masks:**
+    - **Binary**: Grayscale mask with different values for each segmented object
+    - **Color**: Colored mask with different colors for each object
+    - **Overlay**: Original image with segmentation overlay
+    - **Numpy**: Raw segmentation data in numpy array format
+    - **Transparent**: Images that have the background set to transparent
+
 ### Video Mode
 1. Select "Video Mode" from the controls
 2. Open a video file using "File > Open Video"
@@ -113,15 +142,6 @@ The application supports multiple SAM2 model variants:
 - SAM2 Hiera Large (highest accuracy)
 
 Choose your preferred model in "File > Insert Model".
-
-## Output Formats
-
-When saving masks:
-- **Binary**: Grayscale mask with different values for each segmented object
-- **Color**: Colored mask with different colors for each object
-- **Overlay**: Original image with segmentation overlay
-- **Numpy**: Raw segmentation data in numpy array format
-- **Transparent**: Images that have the background set to transparent
 
 ## Note to self:
 1) Make changes (edit code, add files, delete stuff, etc).
