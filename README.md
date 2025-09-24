@@ -131,6 +131,8 @@ When saving masks:
     - `git add app.py README.md utils/helpers.py`   (3 files)
     - `git add src/`    (everything inside folder)
     - `git add *.py`    (certain files only)
+    - `git reset`   (remove everything from staging)
+    - `git reset HEAD app.py` (remove one from staging)
 
 3) Commit (save a snapshot in history):
 
