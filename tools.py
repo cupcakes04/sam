@@ -116,7 +116,7 @@ def show_masks(masks, ax, scores=None, borders=True, alpha=0.4):
                 ax.text(x_min, y_min - 5, f"{scores[i]:.3f}", color='white',
                         fontsize=6, bbox=dict(facecolor='black', alpha=alpha, pad=1))
                 
-def overlay_masks_on_images(image_paths, video_segments, output_path, alpha, show_borders, border_thickness=2):
+def overlay_masks_on_images(image_paths, video_segments, output_path, alpha, show_borders, border_thickness=2, fps=30):
     """
     Overlay masks on images and create output video with optional borders
     
@@ -134,7 +134,7 @@ def overlay_masks_on_images(image_paths, video_segments, output_path, alpha, sho
 
     # Prepare video writer
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(str(output_path), fourcc, 30, (W, H))
+    out = cv2.VideoWriter(str(output_path), fourcc, fps, (W, H))
 
     for idx, img_path in enumerate(image_paths):
         # Read original image
@@ -183,7 +183,7 @@ def overlay_masks_on_images(image_paths, video_segments, output_path, alpha, sho
 
     out.release()
 
-def save_green_screen_masks(image_paths, video_segments, output_path):
+def save_green_screen_masks(image_paths, video_segments, output_path, fps=30):
     """
     Save masks as video with green background (chroma key).
     
@@ -198,7 +198,7 @@ def save_green_screen_masks(image_paths, video_segments, output_path):
 
     # Prepare video writer (MP4, no alpha)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(str(output_path), fourcc, 30, (W, H))
+    out = cv2.VideoWriter(str(output_path), fourcc, fps, (W, H))
 
     for idx, img_path in enumerate(image_paths):
         # Read original image

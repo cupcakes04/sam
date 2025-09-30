@@ -34,6 +34,13 @@ let frameProcessingTime = 100; // Initial estimate in ms
 let adaptiveFrameRate = 100; // Start at 100ms (10 FPS)
 let lastFrameTime = 0;
 
+// Recording state
+let isRecording = false;
+let recordedFrames = [];
+let recordedMasks = [];
+let recordingStartTime = 0;
+let RecordingDuration = 0;
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     canvas = document.getElementById('canvas');
@@ -64,6 +71,20 @@ function setupEventListeners() {
     document.getElementById('resumeWebcamBtn').addEventListener('click', resumeWebcamFeed);
     document.getElementById('startTrackingBtn').addEventListener('click', startLiveTracking);
     document.getElementById('stopTrackingBtn').addEventListener('click', stopLiveTracking);
+    
+    // Recording controls
+    document.getElementById('startRecordingBtn').addEventListener('click', startRecording);
+    document.getElementById('stopRecordingBtn').addEventListener('click', stopRecording);
+    
+    // Frame save controls
+    document.getElementById('saveFrameBinary').addEventListener('click', () => saveCurrentFrame('binary'));
+    document.getElementById('saveFrameColor').addEventListener('click', () => saveCurrentFrame('color'));
+    document.getElementById('saveFrameOverlay').addEventListener('click', () => saveCurrentFrame('overlay'));
+    document.getElementById('saveFrameTransparent').addEventListener('click', () => saveCurrentFrame('transparent'));
+    
+    // Video save controls
+    document.getElementById('saveVideoOverlay').addEventListener('click', () => saveRecordedVideo('overlay'));
+    document.getElementById('saveVideoGreenscreen').addEventListener('click', () => saveRecordedVideo('greenscreen'));
     
     // Extraction percent slider
     document.getElementById('extractionSlider').addEventListener('input', (e) => {
@@ -913,6 +934,8 @@ async function startWebcam() {
             document.getElementById('stopWebcamBtn').style.display = 'inline-block';
             document.getElementById('pauseWebcamBtn').style.display = 'inline-block';
             document.getElementById('resumeWebcamBtn').style.display = 'none';
+            document.getElementById('recordingControls').style.display = 'block';
+            document.getElementById('webcamSaveControls').style.display = 'block';
             document.getElementById('webcamStatus').textContent = '📹 Webcam Active';
             
             // Start frame capture loop
@@ -979,9 +1002,20 @@ async function stopWebcam() {
         document.getElementById('stopWebcamBtn').style.display = 'none';
         document.getElementById('pauseWebcamBtn').style.display = 'none';
         document.getElementById('resumeWebcamBtn').style.display = 'none';
+        document.getElementById('recordingControls').style.display = 'none';
+        document.getElementById('webcamSaveControls').style.display = 'none';
         document.getElementById('startTrackingBtn').style.display = 'inline-block';
         document.getElementById('stopTrackingBtn').style.display = 'none';
         document.getElementById('webcamStatus').textContent = '';
+        
+        // Reset recording state
+        isRecording = false;
+        recordedFrames = [];
+        recordedMasks = [];
+        RecordingDuration = 0;
+        document.getElementById('recordingStatus').textContent = '';
+        document.getElementById('startRecordingBtn').style.display = 'inline-block';
+        document.getElementById('stopRecordingBtn').style.display = 'none';
         
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1060,6 +1094,28 @@ async function captureNextFrame() {
             // Update tracking status
             liveTracking = data.live_tracking;
             updateTrackingUI();
+            
+            // Record frame if recording is active
+            if (isRecording) {
+                recordedFrames.push({
+                    image: data.image,
+                    width: data.width,
+                    height: data.height,
+                    timestamp: Date.now() - recordingStartTime
+                });
+                
+                // Store masks if available
+                if (data.masks) {
+                    recordedMasks.push(data.masks);
+                } else {
+                    recordedMasks.push(null);
+                }
+                
+                // Update recording status
+                const frameCount = recordedFrames.length;
+                const duration = ((Date.now() - recordingStartTime) / 1000).toFixed(1);
+                document.getElementById('recordingStatus').textContent = `🔴 Recording: ${frameCount} frames (${duration}s)`;
+            }
         }
         
         // Calculate processing time and adjust frame rate
@@ -1128,6 +1184,160 @@ function resumeWebcamFeed() {
     }
     
     showStatus('Webcam feed resumed', 'success');
+}
+
+async function startRecording() {
+    if (!webcamActive) {
+        showStatus('Webcam must be active to start recording', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/start_webcam_recording', {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            isRecording = true;
+            recordedFrames = [];
+            recordedMasks = [];
+            recordingStartTime = Date.now();
+            
+            // Update UI
+            document.getElementById('startRecordingBtn').style.display = 'none';
+            document.getElementById('stopRecordingBtn').style.display = 'inline-block';
+            document.getElementById('recordingStatus').textContent = '🔴 Recording: 0 frames (0.0s)';
+            
+            showStatus('Recording started', 'success');
+        } else {
+            throw new Error(data.error || 'Failed to start recording');
+        }
+        
+    } catch (error) {
+        console.error('Start recording error:', error);
+        showStatus('Failed to start recording', 'error');
+    }
+}
+
+async function stopRecording() {
+    try {
+        const response = await fetch('/api/stop_webcam_recording', {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            isRecording = false;
+            
+            // Update UI
+            document.getElementById('startRecordingBtn').style.display = 'inline-block';
+            document.getElementById('stopRecordingBtn').style.display = 'none';
+            
+            const frameCount = recordedFrames.length;
+            const duration = ((Date.now() - recordingStartTime) / 1000).toFixed(1);
+            document.getElementById('recordingStatus').textContent = `⏹ Recording stopped: ${frameCount} frames (${duration}s)`;
+            RecordingDuration = duration;
+            
+            showStatus(`Recording stopped - ${data.frame_count} frames with masks captured`, 'success');
+        } else {
+            throw new Error(data.error || 'Failed to stop recording');
+        }
+        
+    } catch (error) {
+        console.error('Stop recording error:', error);
+        showStatus('Failed to stop recording', 'error');
+    }
+}
+
+async function saveCurrentFrame(format) {
+    if (!webcamActive || !currentImage) {
+        showStatus('No frame available to save', 'error');
+        return;
+    }
+    
+    try {
+        showLoading(true);
+        
+        const response = await fetch('/api/save_webcam_frame', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                format: format
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Create download link
+            const link = document.createElement('a');
+            link.href = 'data:image/png;base64,' + data.image;
+            link.download = data.filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showStatus(`Frame saved as ${format}`, 'success');
+        } else {
+            throw new Error(data.error || 'Failed to save frame');
+        }
+        
+    } catch (error) {
+        console.error('Save frame error:', error);
+        showStatus('Failed to save frame', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+async function saveRecordedVideo(format) {
+    if (recordedFrames.length === 0) {
+        showStatus('No recorded frames to save', 'error');
+        return;
+    }
+    
+    try {
+        showLoading(true);
+        
+        const response = await fetch('/api/save_webcam_video', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                frames: recordedFrames,
+                duration: RecordingDuration,
+                format: format
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Create download link
+            const link = document.createElement('a');
+            link.href = data.download_url;
+            link.download = data.filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showStatus(`Video saved as ${format} - ${recordedFrames.length} frames`, 'success');
+        } else {
+            throw new Error(data.error || 'Failed to save video');
+        }
+        
+    } catch (error) {
+        console.error('Save video error:', error);
+        showStatus('Failed to save video', 'error');
+    } finally {
+        showLoading(false);
+    }
 }
 
 async function startLiveTracking() {

@@ -54,6 +54,26 @@
                     <button id="pauseWebcamBtn" class="btn btn-secondary" style="display: none;">⏸ Pause Feed</button>
                     <button id="resumeWebcamBtn" class="btn btn-secondary" style="display: none;">▶️ Resume Feed</button>
                     <div id="webcamStatus" class="status-text" style="margin-top: 10px;"></div>
+                    
+                    <!-- Recording Controls -->
+                    <div id="recordingControls" style="display: none; margin-top: 10px;">
+                        <button id="startRecordingBtn" class="btn btn-success">🔴 Start Recording</button>
+                        <button id="stopRecordingBtn" class="btn btn-danger" style="display: none;">⏹ Stop Recording</button>
+                        <div id="recordingStatus" class="status-text" style="margin-top: 5px;"></div>
+                    </div>
+                    
+                    <!-- Save Controls -->
+                    <div id="webcamSaveControls" style="display: none; margin-top: 10px;">
+                        <h4>Save Current Frame</h4>
+                        <button id="saveFrameBinary" class="btn btn-save">Save Binary</button>
+                        <button id="saveFrameColor" class="btn btn-save">Save Color</button>
+                        <button id="saveFrameOverlay" class="btn btn-save">Save Overlay</button>
+                        <button id="saveFrameTransparent" class="btn btn-save">Save Transparent</button>
+                        
+                        <h4 style="margin-top: 15px;">Save Recording</h4>
+                        <button id="saveVideoOverlay" class="btn btn-save">Save Video Overlay</button>
+                        <button id="saveVideoGreenscreen" class="btn btn-save">Save Video (Green Screen)</button>
+                    </div>
                 </div>
             </div>
 
@@ -119,14 +139,6 @@
                 </div>
             </div>
 
-            <div class="control-group">
-                <h3>Mask Info</h3>
-                <div class="info-display">
-                    <p>Current Mask: <span id="currentMask">1</span></p>
-                    <p>Total Masks: <span id="totalMasks">1</span></p>
-                    <p>Points Added: <span id="pointCount">0</span></p>
-                </div>
-            </div>
 
             <div class="control-group">
                 <h3>Display Settings</h3>
@@ -157,6 +169,14 @@
 
         <!-- Canvas Area -->
         <div class="canvas-container">
+            <!-- Mask Info Display -->
+            <div class="mask-info-overlay">
+                <div class="mask-info-content">
+                    <span>Mask: <span id="currentMask">1</span>/<span id="totalMasks">1</span></span>
+                    <span>Points: <span id="pointCount">0</span></span>
+                </div>
+            </div>
+            
             <canvas id="canvas"></canvas>
             <div id="loading" class="loading">Processing...</div>
             <div id="status" class="status"></div>

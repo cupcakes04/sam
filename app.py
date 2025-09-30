@@ -11,7 +11,7 @@ import cv2
 import torch
 import copy
 
-from flask import Flask, render_template, request, jsonify, send_file, session
+from flask import Flask, render_template, request, jsonify, send_file, send_from_directory, session
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
@@ -86,6 +86,11 @@ class SAM2Session:
         # Webcam predictor (for live tracking)
         self.webcam_predictor = None
         
+        # Recording state for webcam
+        self.recording_active = False
+        self.recording_start_frame = 0
+        self.recording_segments = {}  # {frame_idx: masks} for recorded frames
+        
     def load_model(self, model_name):
         """Load SAM2 model"""
         if model_name not in self.model_configs:
@@ -151,11 +156,12 @@ class SAM2Session:
             return np.array(Image.open(frame_path).convert('RGB'))
         return None
         
-    def reset_video_predictor(self):
+    def reset_video_predictor(self, reset_seg=True):
         """Reset video predictor state"""
         if self.mode == 'video' and self.inference_state is not None:
             self.predictor.reset_state(self.inference_state)
-        self.reset_segmentation()
+        if reset_seg:
+            self.reset_segmentation()
         self.video_segments = {}
         self.backup_video_segments = {}
     
@@ -251,7 +257,7 @@ class SAM2Session:
     def propagate_annotations(self):
         # Backup current segments
         self.backup_video_segments = copy.deepcopy(self.video_segments)
-    
+        
         # Run propagation throughout the video
         for out_frame_idx, out_obj_ids, out_mask_logits in self.predictor.propagate_in_video(self.inference_state):
             mask_list = []
@@ -370,7 +376,7 @@ def numpy_to_base64(img_array):
     img.save(buffered, format="PNG")
     return base64.b64encode(buffered.getvalue()).decode()
 
-def create_overlay_image(image, masks, points, labels, boxes, alpha=0.4, borders=True):
+def create_overlay_image(image, masks, points=[[]], labels=[[]], boxes=[[]], alpha=0.4, borders=True):
     """Create visualization with masks, points, and boxes"""
     h, w = image.shape[:2]
     overlay = image.copy()
@@ -578,7 +584,7 @@ def navigate_frame():
     else:
         sess.masks = None
     
-    # Reset input annotations for clean display (similar to GUI behavior)
+    # # Reset input annotations for clean display (similar to GUI behavior)
     sess.input_points = [[]]
     sess.input_labels = [[]]
     sess.input_boxes = [[]]
@@ -586,8 +592,7 @@ def navigate_frame():
     # Create overlay
     if sess.image is not None:
         overlay = create_overlay_image(
-            sess.image, sess.masks, sess.input_points, 
-            sess.input_labels, sess.input_boxes, sess.alpha, sess.borders
+            sess.image, sess.masks, alpha=sess.alpha, borders=sess.borders,
         )
         
         return jsonify({
@@ -823,17 +828,22 @@ def process_webcam_frame():
         
         # Create overlay with current annotations and masks
         overlay = create_overlay_image(
-            frame, sess.masks, sess.input_points, 
-            sess.input_labels, sess.input_boxes, sess.alpha, sess.borders
+            frame, sess.masks, alpha=sess.alpha, borders=sess.borders
         )
         # print(f"Overlay shape: {overlay.shape}, dtype: {overlay.dtype}, min: {overlay.min()}, max: {overlay.max()}")
+        
+        # Record masks if recording is active
+        if sess.recording_active and sess.masks is not None:
+            frame_idx = len(sess.recording_segments)
+            sess.recording_segments[frame_idx] = copy.deepcopy(sess.masks)
         
         return jsonify({
             'success': True,
             'image': numpy_to_base64(overlay),
             'width': frame.shape[1],
             'height': frame.shape[0],
-            'live_tracking': sess.live_propagation
+            'live_tracking': sess.live_propagation,
+            'recording_active': sess.recording_active
         })
         
     except Exception as e:
@@ -886,6 +896,196 @@ def stop_webcam_tracking():
         
     except Exception as e:
         return jsonify({'error': f'Failed to stop tracking: {str(e)}'}), 500
+
+@app.route('/api/start_webcam_recording', methods=['POST'])
+def start_webcam_recording():
+    """Start recording webcam frames with masks"""
+    session_id = session.get('session_id')
+    sess = get_session(session_id)
+    
+    if sess.mode != 'webcam' or not sess.webcam_active:
+        return jsonify({'error': 'Webcam must be active to start recording'}), 400
+    
+    try:
+        sess.recording_active = True
+        sess.recording_start_frame = 0
+        sess.recording_segments = {}
+        
+        return jsonify({
+            'success': True,
+            'message': 'Recording started',
+            'recording_active': sess.recording_active
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to start recording: {str(e)}'}), 500
+
+@app.route('/api/stop_webcam_recording', methods=['POST'])
+def stop_webcam_recording():
+    """Stop recording webcam frames"""
+    session_id = session.get('session_id')
+    sess = get_session(session_id)
+    
+    try:
+        sess.recording_active = False
+        frame_count = len(sess.recording_segments)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Recording stopped - {frame_count} frames captured',
+            'recording_active': sess.recording_active,
+            'frame_count': frame_count
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to stop recording: {str(e)}'}), 500
+
+@app.route('/api/save_webcam_frame', methods=['POST'])
+def save_webcam_frame():
+    """Save current webcam frame in specified format"""
+    session_id = session.get('session_id')
+    sess = get_session(session_id)
+    
+    if sess.mode != 'webcam' or sess.webcam_frame is None:
+        return jsonify({'error': 'No webcam frame available'}), 400
+    
+    data = request.json
+    format_type = data.get('format', 'overlay')
+    
+    try:
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        if format_type == 'binary':
+            # Create binary mask image
+            if sess.masks is not None:
+                h, w = sess.webcam_frame.shape[:2]
+                binary_img = np.zeros((h, w), dtype=np.uint8)
+                for i, mask in enumerate(sess.masks):
+                    binary_img[mask > 0] = (i + 1) * 50  # Different values for different masks
+                result_img = binary_img
+            else:
+                result_img = np.zeros(sess.webcam_frame.shape[:2], dtype=np.uint8)
+            filename = f"webcam_binary_{timestamp}.png"
+            
+        elif format_type == 'color':
+            # Create colored mask image
+            if sess.masks is not None:
+                h, w = sess.webcam_frame.shape[:2]
+                color_img = np.zeros((h, w, 3), dtype=np.uint8)
+                for i, mask in enumerate(sess.masks):
+                    color = COLORS[i % len(COLORS)]
+                    for channel in range(3):
+                        color_img[mask > 0, channel] = color[channel]
+                result_img = color_img
+            else:
+                result_img = np.zeros(sess.webcam_frame.shape, dtype=np.uint8)
+            filename = f"webcam_color_{timestamp}.png"
+            
+        elif format_type == 'overlay':
+            # Create overlay image
+            result_img = create_overlay_image(
+                sess.webcam_frame, sess.masks, alpha=sess.alpha, borders=sess.borders
+            )
+            filename = f"webcam_overlay_{timestamp}.png"
+            
+        elif format_type == 'transparent':
+            # Create transparent mask image
+            if sess.masks is not None:
+                h, w = sess.webcam_frame.shape[:2]
+                # Create RGBA image
+                result_img = np.zeros((h, w, 4), dtype=np.uint8)
+                result_img[:, :, 3] = 0  # Transparent background
+                
+                for i, mask in enumerate(sess.masks):
+                    color = COLORS[i % len(COLORS)]
+                    result_img[mask > 0, :3] = color
+                    result_img[mask > 0, 3] = 180  # Semi-transparent
+            else:
+                result_img = np.zeros((*sess.webcam_frame.shape[:2], 4), dtype=np.uint8)
+            filename = f"webcam_transparent_{timestamp}.png"
+        
+        # Convert to base64
+        result_base64 = numpy_to_base64(result_img)
+        
+        return jsonify({
+            'success': True,
+            'image': result_base64,
+            'filename': filename
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to save frame: {str(e)}'}), 500
+
+@app.route('/api/save_webcam_video', methods=['POST'])
+def save_webcam_video():
+    """Save recorded webcam video"""
+    session_id = session.get('session_id')
+    sess = get_session(session_id)
+    
+    data = request.json
+    frames = data.get('frames', [])
+    duration = data.get('duration', 0)
+    format_type = data.get('format', 'overlay')
+    fps = float(len(frames)) / float(duration)
+    
+    if not frames:
+        return jsonify({'error': 'No frames to save'}), 400
+    
+    try:
+        import datetime
+        import tempfile
+        import os
+        from tools import overlay_masks_on_images, save_green_screen_masks
+        
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Create temporary directory for frames
+        with tempfile.TemporaryDirectory() as temp_dir:
+            frame_paths = []
+            video_segments = {}
+            
+            # Save frames and prepare data
+            for i, frame_data in enumerate(frames):
+                # Decode frame image from base64
+                frame_b64 = frame_data['image']
+                if frame_b64.startswith('data:image'):
+                    frame_b64 = frame_b64.split(',')[1]
+                
+                frame_img_data = base64.b64decode(frame_b64)
+                
+                # Convert to numpy array and save as PNG
+                img = Image.open(BytesIO(frame_img_data)).convert('RGB')
+                frame_array = np.array(img)
+                frame_path = os.path.join(temp_dir, f"frame_{i:06d}.png")
+                Image.fromarray(frame_array).save(frame_path)
+                frame_paths.append(frame_path)
+                
+                # Add recorded mask data if available
+                if i in sess.recording_segments:
+                    video_segments[i] = sess.recording_segments[i]
+            
+            # Create output video
+            output_dir = Path("webapp/uploads")
+            output_dir.mkdir(exist_ok=True)
+            
+            if format_type == 'greenscreen':
+                output_path = output_dir / f"webcam_greenscreen_{timestamp}.mp4"
+                save_green_screen_masks(frame_paths, video_segments, output_path, fps=fps)
+                filename = f"webcam_greenscreen_{timestamp}.mp4"
+            else:  # overlay
+                output_path = output_dir / f"webcam_overlay_{timestamp}.mp4"
+                overlay_masks_on_images(frame_paths, video_segments, output_path, alpha=sess.alpha, show_borders=sess.borders, fps=fps)
+                filename = f"webcam_overlay_{timestamp}.mp4"
+            
+            return jsonify({
+                'success': True,
+                'download_url': f'/uploads/{filename}',
+                'filename': filename
+            })
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to save video: {str(e)}'}), 500
 
 @app.route('/api/save_masks', methods=['POST'])
 def save_masks():
@@ -972,6 +1172,11 @@ def save_masks():
             return jsonify({'error': f'Failed to save video: {str(e)}'}), 500
     
     return jsonify({'error': 'Invalid mode or no data to save'}), 400
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    """Serve uploaded files"""
+    return send_from_directory('webapp/uploads', filename)
 
 if __name__ == '__main__':
     os.chdir(Path(__file__).resolve().parent)
