@@ -143,8 +143,8 @@ function setupEventListeners() {
     document.getElementById('saveTransparent').addEventListener('click', () => saveMasks('transparent'));
     
     // Save buttons - Video
-    document.getElementById('saveVideoOverlay').addEventListener('click', () => saveMasks('overlay'));
-    document.getElementById('saveVideoTransparent').addEventListener('click', () => saveMasks('transparent'));
+    document.getElementById('saveVideoOverlayWeb').addEventListener('click', () => saveMasks('overlay'));
+    document.getElementById('saveVideoGreenscreenWeb').addEventListener('click', () => saveMasks('transparent'));
     
     // Canvas interactions
     canvas.addEventListener('mousedown', onCanvasMouseDown);
