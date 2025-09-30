@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAM2 Interactive Segmentation</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>SAM2 Interactive Segmentation Tool</h1>
+            <p>Upload an image and click to add positive/negative points or drag to create boxes</p>
+        </header>
+
+        <!-- Control Panel -->
+        <div class="controls">
+            <div class="control-group">
+                <h3>Mode Selection</h3>
+                <div class="radio-group">
+                    <label>
+                        <input type="radio" name="mode" value="image" checked>
+                        <span class="radio-label">Image Mode</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="mode" value="video">
+                        <span class="radio-label">Video Mode</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="mode" value="webcam">
+                        <span class="radio-label">Webcam Mode</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>File Operations</h3>
+                <div id="imageControls">
+                    <input type="file" id="imageUpload" accept="image/*">
+                    <button id="uploadBtn" class="btn btn-primary">Upload Image</button>
+                </div>
+                <div id="videoControls" style="display: none;">
+                    <input type="file" id="videoUpload" accept="video/*">
+                    <button id="uploadVideoBtn" class="btn btn-primary">Upload Video</button>
+                    <label>
+                        Frame Extraction %: <span id="extractionValue">100</span>
+                        <input type="range" id="extractionSlider" min="10" max="100" step="10" value="100">
+                    </label>
+                </div>
+                <div id="webcamControls" style="display: none;">
+                    <button id="startWebcamBtn" class="btn btn-primary">📹 Start Webcam</button>
+                    <button id="stopWebcamBtn" class="btn btn-warning" style="display: none;">⏹ Stop Webcam</button>
+                    <button id="pauseWebcamBtn" class="btn btn-secondary" style="display: none;">⏸ Pause Feed</button>
+                    <button id="resumeWebcamBtn" class="btn btn-secondary" style="display: none;">▶️ Resume Feed</button>
+                    <div id="webcamStatus" class="status-text" style="margin-top: 10px;"></div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Annotation Mode</h3>
+                <div class="radio-group">
+                    <label>
+                        <input type="radio" name="label" value="1" checked>
+                        <span class="radio-label positive">Positive Point</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="label" value="0">
+                        <span class="radio-label negative">Negative Point</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="mode" value="box">
+                        <span class="radio-label box">Bounding Box (Ctrl+Drag)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Actions</h3>
+                <button id="predictBtn" class="btn btn-success">Predict Mask (Enter)</button>
+                <button id="addMaskBtn" class="btn">Add New Mask (A)</button>
+                <button id="deleteMaskBtn" class="btn">Delete Mask (D)</button>
+                <button id="resetBtn" class="btn btn-warning">Reset All</button>
+                
+                <!-- Video-specific controls -->
+                <div id="videoActions" style="display: none;">
+                    <button id="propagateBtn" class="btn btn-info">Propagate Masks</button>
+                    <button id="resetVideoBtn" class="btn btn-warning">Reset Video</button>
+                </div>
+                
+                <!-- Webcam-specific controls -->
+                <div id="webcamActions" style="display: none;">
+                    <button id="startTrackingBtn" class="btn btn-info">🎯 Start Live Tracking</button>
+                    <button id="stopTrackingBtn" class="btn btn-warning" style="display: none;">⏹ Stop Tracking</button>
+                </div>
+            </div>
+
+            <!-- Video Navigation -->
+            <div class="control-group" id="videoNavigation" style="display: none;">
+                <h3>Video Navigation</h3>
+                <div class="video-controls">
+                    <button id="playPauseBtn" class="btn btn-primary">▶ Play</button>
+                    <button id="prevFrameBtn" class="btn">◀ Prev</button>
+                    <button id="nextFrameBtn" class="btn">Next ▶</button>
+                    <button id="prevTenBtn" class="btn">◀◀ -10</button>
+                    <button id="nextTenBtn" class="btn">+10 ▶▶</button>
+                </div>
+                <div class="playback-controls">
+                    <label>
+                        Playback Speed: <span id="speedValue">1x</span>
+                        <input type="range" id="speedSlider" min="0.25" max="3" step="0.25" value="1">
+                    </label>
+                </div>
+                <div class="frame-slider-container">
+                    <input type="range" id="frameSlider" min="1" max="1" value="1" disabled>
+                    <div class="frame-info">
+                        <span>Frame: <span id="currentFrameDisplay">1</span> / <span id="totalFramesDisplay">1</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Mask Info</h3>
+                <div class="info-display">
+                    <p>Current Mask: <span id="currentMask">1</span></p>
+                    <p>Total Masks: <span id="totalMasks">1</span></p>
+                    <p>Points Added: <span id="pointCount">0</span></p>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Display Settings</h3>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="bordersCheck" checked>
+                    Show Borders
+                </label>
+                <label>
+                    Overlay Alpha: <span id="alphaValue">0.4</span>
+                    <input type="range" id="alphaSlider" min="0" max="1" step="0.1" value="0.4">
+                </label>
+            </div>
+
+            <div class="control-group">
+                <h3>Save Results</h3>
+                <div id="imageSaveControls">
+                    <button id="saveOverlay" class="btn btn-save">Save Overlay</button>
+                    <button id="saveBinary" class="btn btn-save">Save Binary</button>
+                    <button id="saveColor" class="btn btn-save">Save Color</button>
+                    <button id="saveTransparent" class="btn btn-save">Save Transparent</button>
+                </div>
+                <div id="videoSaveControls" style="display: none;">
+                    <button id="saveVideoOverlay" class="btn btn-save">Save Video Overlay</button>
+                    <button id="saveVideoTransparent" class="btn btn-save">Save Video (Green Screen)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas Area -->
+        <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+            <div id="loading" class="loading">Processing...</div>
+            <div id="status" class="status"></div>
+        </div>
+
+        <!-- Keyboard Shortcuts -->
+        <div class="shortcuts">
+            <h3>Keyboard Shortcuts</h3>
+            <ul>
+                <li><strong>Enter:</strong> Predict Mask</li>
+                <li><strong>A:</strong> Add New Mask</li>
+                <li><strong>D:</strong> Delete Current Mask</li>
+                <li><strong>R:</strong> Reset All</li>
+                <li><strong>Shift:</strong> Toggle Point Label</li>
+                <li><strong>Ctrl+Drag:</strong> Create Bounding Box</li>
+                <li><strong>Space:</strong> Play/Pause Video</li>
+                <li><strong>←/→:</strong> Previous/Next Frame</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

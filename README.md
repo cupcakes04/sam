@@ -140,26 +140,3 @@ The application supports multiple SAM2 model variants:
 - SAM2 Hiera Large (highest accuracy)
 
 Choose your preferred model in "File > Insert Model".
-
-## Note to self:
-1) Make changes (edit code, add files, delete stuff, etc).
-
-2) Stage changes (tell Git which changes to include):
-
-    - `git add .`   (commit all)
-    - `git add app.py`  (one file)
-    - `git add app.py README.md utils/helpers.py`   (3 files)
-    - `git add src/`    (everything inside folder)
-    - `git add *.py`    (certain files only)
-    - `git reset`   (remove everything from staging)
-    - `git reset HEAD app.py` (remove one from staging)
-
-3) Commit (save a snapshot in history):
-
-    `git commit -m "Describe what you changed"`
-
-4) Push to GitHub (sync your commits):
-
-    `git push`
-    
-Repeat steps 1 → 4 every time you’re done with a piece of work.
